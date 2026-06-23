@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ConvertFlow — Universal Document Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Theme detector — runs instantly before paint -->
+    <script>
+        (function() {
+            const theme = localStorage.getItem('cf-theme') || 'light';
+            const html = document.documentElement;
+            html.setAttribute('data-theme', theme);
+            if (theme === 'dark') html.classList.add('dark');
+            else html.classList.remove('dark');
+        })();
+    </script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'monospace'],
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'marquee': 'marquee 35s linear infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'slide-up': 'slideUp 0.6s ease-out forwards',
+                        'fade-in': 'fadeIn 0.4s ease-out forwards',
+                    },
+                    keyframes: {
+                        marquee: {
+                            '0%': { transform: 'translateX(0)' },
+                            '100%': { transform: 'translateX(-50%)' },
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* ===== THEME SYSTEM ===== */
+        :root {
+            --bg: #ffffff;
+            --bg-secondary: #fafafa;
+            --bg-card: #ffffff;
+            --text: #171717;
+            --text-muted: #737373;
+            --border: #e5e5e5;
+            --accent: #171717;
+            --selection: #d4d4d4;
+            --glow: rgba(0,0,0,0.05);
+        }
+
+        html.dark {
+            --bg: #050505;
+            --bg-secondary: #0a0a0a;
+            --bg-card: #0a0a0a;
+            --text: #fafafa;
+            --text-muted: #a3a3a3;
+            --border: #262626;
+            --accent: #ffffff;
+            --selection: #404040;
+            --glow: rgba(255,255,255,0.06);
+        }
+
+        html[data-theme="midnight"] {
+            --bg: #02040a;
+            --bg-secondary: #0a192f;
+            --bg-card: #0a192f;
+            --text: #e6f1ff;
+            --text-muted: #8892b0;
+            --border: #172a45;
+            --accent: #64ffda;
+            --selection: rgba(100, 255, 218, 0.25);
+            --glow: rgba(100, 255, 218, 0.08);
+        }
+
+        html[data-theme="zen"] {
+            --bg: #faf8f5;
+            --bg-secondary: #f5f0e8;
+            --bg-card: #ffffff;
+            --text: #2c2420;
+            --text-muted: #8c7e72;
+            --border: #e8e0d5;
+            --accent: #5c7c5c;
+            --selection: rgba(92, 124, 92, 0.25);
+            --glow: rgba(92, 124, 92, 0.06);
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            transition: background-color 0.4s ease, color 0.4s ease;
+        }
+
+        ::selection {
+            background: var(--selection);
+            color: var(--text);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        /* Noise */
+        .noise {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.025;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+        html.dark .noise, html[data-theme="midnight"] .noise { opacity: 0.04; }
+
+        /* Grid */
+        .grid-bg {
+            background-image: linear-gradient(var(--border) 1px, transparent 1px),
+                              linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 40px 40px;
+            opacity: 0.3;
+        }
+
+        /* Upload */
+        .upload-zone {
+            border: 2px dashed var(--border);
+        }
+        .upload-zone.dragover {
+            transform: scale(1.02);
+            border-color: var(--accent);
+            background: var(--glow);
+        }
+
+        /* Cards */
+        .c-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+        .c-card:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 40px var(--glow);
+            transform: translateY(-2px);
+        }
+
+        /* Progress */
+        .progress-stripe {
+            background-image: linear-gradient(45deg, rgba(255,255,255,.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.15) 50%, rgba(255,255,255,.15) 75%, transparent 75%, transparent);
+            background-size: 1rem 1rem;
+            animation: progress-stripes 1s linear infinite;
+        }
+        @keyframes progress-stripes {
+            from { background-position: 1rem 0; }
+            to { background-position: 0 0; }
+        }
+
+        /* Ticker */
+        .ticker-track {
+            display: inline-flex;
+            animation: marquee 35s linear infinite;
+            white-space: nowrap;
+        }
+        .ticker-track:hover {
+            animation-play-state: paused;
+        }
+
+        /* Command Palette */
+        .cmd-pal {
+            backdrop-filter: blur(20px);
+            background: rgba(var(--bg-secondary), 0.95);
+        }
+
+        /* Cursor */
+        .cursor-blink::after {
+            content: '_';
+            animation: blink 1s step-end infinite;
+            color: var(--accent);
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* Nav glass */
+        .nav-glass {
+            background: rgba(var(--bg), 0.8);
+            backdrop-filter: blur(12px);
+        }
+
+        /* Hide elements initially for observer */
+        .reveal {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+
+<body class="font-sans antialiased">
+
+    <!-- Noise Overlay -->
+    <div class="noise"></div>
+
+    <!-- Command Palette -->
+    <div id="commandPalette" class="fixed inset-0 z-[60] hidden items-start justify-center pt-[20vh] p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeCommandPalette()"></div>
+        <div class="relative w-full max-w-2xl rounded-xl border shadow-2xl overflow-hidden animate-fade-in" 
+             style="background: var(--bg-card); border-color: var(--border);">
+            <div class="flex items-center gap-3 p-4 border-b" style="border-color: var(--border);">
+                <i class="fa-solid fa-magnifying-glass" style="color: var(--text-muted);"></i>
+                <input type="text" id="commandInput" placeholder="Search converters..." 
+                    class="w-full bg-transparent font-mono text-sm outline-none"
+                    style="color: var(--text);">
+                <kbd class="hidden sm:inline-block px-2 py-1 rounded font-mono text-xs" 
+                     style="background: var(--bg-secondary); color: var(--text-muted);">ESC</kbd>
+            </div>
+            <div id="commandResults" class="max-h-[300px] overflow-y-auto p-2"></div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav id="navbar" class="fixed top-0 w-full z-50 transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3 group cursor-pointer" onclick="window.scrollTo(0,0)">
+                    <div class="w-8 h-8 rounded flex items-center justify-center" style="background: var(--accent);">
+                        <i class="fa-solid fa-code text-sm" style="color: var(--bg);"></i>
+                    </div>
+                    <div class="font-mono font-bold text-xl tracking-tight" style="color: var(--text);">
+                        Convert<span style="color: var(--text-muted);">Flow</span>
+                    </div>
+                </div>
+
+                <div class="hidden md:flex items-center gap-8 font-mono text-sm" style="color: var(--text-muted);">
+                    <a href="#converters" class="hover:text-[var(--accent)] transition-colors">Converters</a>
+                    <a href="#features" class="hover:text-[var(--accent)] transition-colors">Features</a>
+                    <a href="#pricing" class="hover:text-[var(--accent)] transition-colors">Pricing</a>
+                    <a href="#api" class="hover:text-[var(--accent)] transition-colors">API</a>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <button onclick="openCommandPalette()" class="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors"
+                        style="border-color: var(--border); color: var(--text-muted);">
+                        <i class="fa-solid fa-command text-xs"></i>
+                        <span class="font-mono text-xs">Ctrl K</span>
+                    </button>
+
+                    <button id="themeToggle" class="w-10 h-10 rounded-full border flex items-center justify-center transition-colors"
+                        style="border-color: var(--border); color: var(--text);">
+                        <i class="fa-solid fa-sun" id="themeIcon"></i>
+                    </button>
+
+                    <div class="hidden sm:flex items-center gap-2 font-mono text-sm">
+                        <button class="px-4 py-2 rounded transition-colors" style="color: var(--text-muted);">Sign In</button>
+                        <button class="px-4 py-2 rounded font-medium transition-opacity hover:opacity-90"
+                            style="background: var(--accent); color: var(--bg);">Get Started</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden">
+        <div class="absolute inset-0 grid-bg pointer-events-none"></div>
+        <div class="absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-3xl opacity-20 animate-pulse-slow" 
+             style="background: var(--accent);"></div>
+        <div class="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full blur-3xl opacity-10 animate-pulse-slow" 
+             style="background: var(--accent); animation-delay: 1.5s;"></div>
+
+        <div class="relative max-w-5xl mx-auto px-6 text-center">
+            <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full border mb-8 animate-slide-up" 
+                 style="border-color: var(--border); background: var(--bg-secondary);">
+                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                <span class="font-mono text-xs" style="color: var(--text-muted);">50+ formats supported • 99.9% uptime</span>
+            </div>
+
+            <h1 class="font-mono font-bold text-5xl md:text-7xl mb-6 leading-tight animate-slide-up" style="animation-delay: 0.1s; color: var(--text);">
+                <span class="block">Convert Anything</span>
+                <span class="block mt-2" style="color: var(--text-muted);">To Anything<span class="cursor-blink"></span></span>
+            </h1>
+
+            <p class="font-mono text-lg md:text-xl max-w-2xl mx-auto mb-12 leading-relaxed animate-slide-up" style="animation-delay: 0.2s; color: var(--text-muted);">
+                Professional-grade document conversion.<br>Secure, fast, and beautifully minimal.
+            </p>
+
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up" style="animation-delay: 0.3s;">
+                <button onclick="document.getElementById('converters').scrollIntoView({behavior: 'smooth'})" 
+                    class="px-8 py-4 rounded font-mono font-medium hover:scale-105 transition-transform shadow-lg"
+                    style="background: var(--accent); color: var(--bg);">
+                    Start Converting
+                </button>
+                <button onclick="openCommandPalette()" 
+                    class="px-8 py-4 rounded font-mono border transition-colors"
+                    style="border-color: var(--border); color: var(--text);">
+                    Quick Search
+                </button>
+            </div>
+
+            <div class="mt-20 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl mx-auto animate-slide-up" style="animation-delay: 0.4s;">
+                <div class="text-center">
+                    <div class="font-mono font-bold text-2xl" style="color: var(--text);">50+</div>
+                    <div class="font-mono text-xs mt-1" style="color: var(--text-muted);">formats</div>
+                </div>
+                <div class="text-center">
+                    <div class="font-mono font-bold text-2xl" style="color: var(--text);">2M+</div>
+                    <div class="font-mono text-xs mt-1" style="color: var(--text-muted);">conversions</div>
+                </div>
+                <div class="text-center">
+                    <div class="font-mono font-bold text-2xl" style="color: var(--text);">0.3s</div>
+                    <div class="font-mono text-xs mt-1" style="color: var(--text-muted);">avg speed</div>
+                </div>
+                <div class="text-center">
+                    <div class="font-mono font-bold text-2xl" style="color: var(--text);">100%</div>
+                    <div class="font-mono text-xs mt-1" style="color: var(--text-muted);">privacy</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Live Ticker -->
+    <div class="border-y overflow-hidden py-3" style="border-color: var(--border); background: var(--bg-secondary);">
+        <div class="whitespace-nowrap">
+            <div class="ticker-track font-mono text-xs" style="color: var(--text-muted);">
+                <span class="mx-8">🔥 someone from Mumbai just converted PDF → Word</span>
+                <span class="mx-8">⚡ someone from London just converted JPG → PDF</span>
+                <span class="mx-8">🚀 someone from New York just merged 5 PDFs</span>
+                <span class="mx-8">💎 someone from Tokyo just subscribed to Pro</span>
+                <span class="mx-8">🔥 someone from Berlin just converted Excel → PDF</span>
+                <span class="mx-8">⚡ someone from Paris just compressed a 50MB PDF</span>
+                <span class="mx-8">🚀 someone from Dubai just used OCR extraction</span>
+                <span class="mx-8">💎 someone from Sydney just converted PPT → PDF</span>
+                <!-- Duplicate for seamless loop -->
+                <span class="mx-8">🔥 someone from Mumbai just converted PDF → Word</span>
+                <span class="mx-8">⚡ someone from London just converted JPG → PDF</span>
+                <span class="mx-8">🚀 someone from New York just merged 5 PDFs</span>
+                <span class="mx-8">💎 someone from Tokyo just subscribed to Pro</span>
+                <span class="mx-8">🔥 someone from Berlin just converted Excel → PDF</span>
+                <span class="mx-8">⚡ someone from Paris just compressed a 50MB PDF</span>
+                <span class="mx-8">🚀 someone from Dubai just used OCR extraction</span>
+                <span class="mx-8">💎 someone from Sydney just converted PPT → PDF</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Converters -->
+    <section id="converters" class="py-24 relative">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-16 reveal">
+                <div class="font-mono text-xs mb-2" style="color: var(--text-muted);">// 01</div>
+                <h2 class="font-mono font-bold text-3xl md:text-4xl mb-4" style="color: var(--text);">Universal Converter</h2>
+                <p class="font-mono text-sm" style="color: var(--text-muted);">Drag. Drop. Done.</p>
+            </div>
+
+            <!-- Upload -->
+            <div class="max-w-3xl mx-auto mb-16 reveal">
+                <div id="uploadZone" class="upload-zone relative rounded-2xl p-12 text-center cursor-pointer transition-all duration-300 group">
+                    <input type="file" id="fileInput" class="hidden" multiple accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.webp,.xls,.xlsx,.ppt,.pptx,.html,.md">
+                    <div class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform"
+                         style="background: var(--bg-secondary);">
+                        <i class="fa-solid fa-cloud-arrow-up text-2xl" style="color: var(--text-muted);"></i>
+                    </div>
+                    <h3 class="font-mono font-medium text-lg mb-2" style="color: var(--text);">Drop files here</h3>
+                    <p class="font-mono text-xs" style="color: var(--text-muted);">
+                        Supports: PDF, DOC, DOCX, TXT, JPG, PNG, WEBP, XLS, XLSX, PPT, HTML, MD<br>
+                        Max file size: 100MB • Secure SSL encryption
+                    </p>
+                    <div class="flex flex-wrap justify-center gap-2 mt-6">
+                        <span class="px-3 py-1 rounded-full font-mono text-xs" style="background: var(--bg-secondary); color: var(--text-muted);">PDF</span>
+                        <span class="px-3 py-1 rounded-full font-mono text-xs" style="background: var(--bg-secondary); color: var(--text-muted);">DOCX</span>
+                        <span class="px-3 py-1 rounded-full font-mono text-xs" style="background: var(--bg-secondary); color: var(--text-muted);">TXT</span>
+                        <span class="px-3 py-1 rounded-full font-mono text-xs" style="background: var(--bg-secondary); color: var(--text-muted);">JPG</span>
+                        <span class="px-3 py-1 rounded-full font-mono text-xs" style="background: var(--bg-secondary); color: var(--text-muted);">PNG</span>
+                        <span class="px-3 py-1 rounded-full font-mono text-xs" style="background: var(--bg-secondary); color: var(--text-muted);">XLSX</span>
+                    </div>
+                </div>
+                <div id="conversionArea" class="hidden mt-8 space-y-4"></div>
+            </div>
+
+            <!-- Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="c-card group p-6 rounded-xl cursor-pointer reveal" onclick="selectConverter('text-to-pdf')">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--bg-secondary);">
+                            <i class="fa-solid fa-file-lines" style="color: var(--text-muted);"></i>
+                        </div>
+                        <span class="font-mono text-xs" style="color: var(--text-muted);">TXT → PDF</span>
+                    </div>
+                    <h3 class="font-mono font-medium mb-1" style="color: var(--text);">Text to PDF</h3>
+                    <p class="font-mono text-xs" style="color: var(--text-muted);">Convert plain text, markdown, and code files to formatted PDF documents</p>
+                </div>
+
+                <div class="c-card group p-6 rounded-xl cursor-pointer reveal" onclick="selectConverter('word-to-pdf')">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--bg-secondary);">
+                            <i class="fa-solid fa-file-word" style="color: var(--text-muted);"></i>
+                        </div>
+                        <span class="font-mono text-xs" style="color: var(--text-muted);">DOCX → PDF</span>
+                    </div>
+                    <h3 class="font-mono font-medium mb-1" style="color: var(--text);">Word to PDF</h3>
+                    <p class="font-mono text-xs" style="color: var(--text-muted);">Preserve formatting, fonts, and layouts from Word documents</p>
+                </div>
+
+                <div class="c-card group p-6 rounded-xl cursor-pointer reveal" onclick="selectConverter('pdf-to-word')">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--bg-secondary);">
+                            <i class="fa-solid fa-file-pdf" style="color: var(--text-muted);"></i>
+                        </div>
+                        <span class="font-mono text-xs" style="color: var(--text-muted);">PDF → DOCX</span>
+                    </div>
+                    <h3 class="font-mono font-medium mb-1" style="color: var(--text);">PDF to Word</h3>
+                    <p class="font-mono text-xs" style="color: var(--text-muted);">Extract text and images from PDFs into editable Word files</p>
+                </div>
+
+                <div class="c-card group p-6 rounded-xl cursor-pointer reveal" onclick="selectConverter('image-to-pdf')">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--bg-secondary);">
+                            <i class="fa-solid fa-image" style="color: var(--text-muted);"></i>
+                        </div>
+                        <span class="font-mono text-xs" style="color: var(--text-muted);">IMG → PDF</span>
+                    </div>
+                    <h3 class="font-mono font-medium mb-1" style="color: var(--text);">Image to PDF</h3>
+                    <p class="font-mono text-xs" style="color: var(--text-muted);">Merge multiple images into a single PDF or convert individually</p>
+                </div>
+
+                <div class="c-card group p-6 rounded-xl cursor-pointer reveal" onclick="selectConverter('pdf-to-image')">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--bg-secondary);">
+                            <i class="fa-solid fa-images" style="color: var(--text-muted);"></i>
+                        </div>
+                        <span class="font-mono text-xs" style="color: var(--text-muted);">PDF → IMG</span>
+                    </div>
+                    <h3 class="font-mono font-medium mb-1" style="color: var(--text);">PDF to Image</h3>
+                    <p class="font-mono text-xs" style="color: var(--text-muted);">Convert PDF pages to high-resolution PNG, JPG, or WebP</p>
+                </div>
+
+                <div class="c-card group p-6 rounded-xl cursor-pointer reveal" onclick="selectConverter('merge-pdf')">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--bg-secondary);">
+                            <i class="fa-solid fa-object-group" style="color: var(--text-muted);"></i>
+                        </div>
+                        <span class="font-mono text-xs" style="color: var(--text-muted);">PDF + PDF</span>
+                    </div>
+                    <h3 class="font-mono font-medium mb-1" style="color: var(--text);">Merge PDF</h3>
+                    <p class="font-mono text-xs" style="color: var(--text-muted);">Combine multiple PDFs into one with custom page ordering</p>
+                </div>
+
+                <div class="c-card group p-6 rounded-xl cursor-pointer reveal" onclick="selectConverter('split-pdf')">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--bg-secondary);">
+                            <i class="fa-solid fa-scissors" style="color: var(--text-muted);"></i>
+                        </div>
+                        <span class="font-mono text-xs" style="color: var(--text-muted);">PDF → PDFs</span>
+                    </div>
+                    <h3 class="font-mono font-medium mb-1" style="color: var(--text);">Split PDF</h3>
+                    <p class="font-mono text-xs" style="color: var(--text-muted);">Extract specific pages or split by page ranges</p>
+                </div>
+
+                <div class="c-card group p-6 rounded-xl cursor-pointer reveal" onclick="selectConverter('compress-pdf')">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--bg-secondary);">
+                            <i class="fa-solid fa-compress" style="color: var(--text-muted);"></i>
+                        </div>
+                        <span class="font-mono text-xs" style="color: var(--text-muted);">PDF → PDF</span>
+                    </div>
+                    <h3 class="font-mono font-medium mb-1" style="color: var(--text);">Compress PDF</h3>
+                    <p class="font-mono text-xs" style="color: var(--text-muted);">Reduce file size while maintaining quality up to 80%</p>
+                </div>
+
+                <div class="c-card group p-6 rounded-xl cursor-pointer reveal" onclick="selectConverter('excel-to-pdf')">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--bg-secondary);">
+                            <i class="fa-solid fa-file-excel" style="color: var(--text-muted);"></i>
+                        </div>
+                        <span class="font-mono text-xs" style="color: var(--text-muted);">XLSX → PDF</span>
+                    </div>
+                    <h3 class="font-mono font-medium mb-1" style="color: var(--text);">Excel to PDF</h3>
+                    <p class="font-mono text-xs" style="color: var(--text-muted);">Convert spreadsheets with preserved formulas and formatting</p>
+                </div>
+
+                <div class="c-card group p-6 rounded-xl cursor-pointer reveal" onclick="selectConverter('ppt-to-pdf')">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--bg-secondary);">
+                            <i class="fa-solid fa-file-powerpoint" style="color: var(--text-muted);"></i>
+                        </div>
+                        <span class="font-mono text-xs" style="color: var(--text-muted);">PPT → PDF</span>
+                    </div>
+                    <h3 class="font-mono font-medium mb-1" style="color: var(--text);">PPT to PDF</h3>
+                    <p class="font-mono text-xs" style="color: var(--text-muted);">Transform presentations into slide-perfect PDF documents</p>
+                </div>
+
+                <div class="c-card group p-6 rounded-xl cursor-pointer reveal" onclick="selectConverter('html-to-pdf')">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--bg-secondary);">
+                            <i class="fa-brands fa-html5" style="color: var(--text-muted);"></i>
+                        </div>
+                        <span class="font-mono text-xs" style="color: var(--text-muted);">HTML → PDF</span>
+                    </div>
+                    <h3 class="font-mono font-medium mb-1" style="color: var(--text);">HTML to PDF</h3>
+                    <p class="font-mono text-xs" style="color: var(--text-muted);">Render web pages and HTML templates as print-ready PDFs</p>
+                </div>
+
+                <div class="c-card group p-6 rounded-xl cursor-pointer reveal" onclick="selectConverter('ocr-pdf')">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--bg-secondary);">
+                            <i class="fa-solid fa-eye" style="color: var(--text-muted);"></i>
+                        </div>
+                        <span class="font-mono text-xs" style="color: var(--text-muted);">IMG → TXT</span>
+                    </div>
+                    <h3 class="font-mono font-medium mb-1" style="color: var(--text);">OCR Extraction</h3>
+                    <p class="font-mono text-xs" style="color: var(--text-muted);">Extract editable text from scanned images and PDFs</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="py-24 border-y" style="border-color: var(--border);">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-16 reveal">
+                <div class="font-mono text-xs mb-2" style="color: var(--text-muted);">// 02</div>
+                <h2 class="font-mono font-bold text-3xl md:text-4xl" style="color: var(--text);">Why ConvertFlow</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="c-card p-6 rounded-xl reveal">
+                    <div class="w-12 h-12 rounded-lg flex items-center justify-center mb-4" style="background: var(--bg-secondary);">
+                        <i class="fa-solid fa-shield-halved" style="color: var(--text);"></i>
+                    </div>
+                    <h3 class="font-mono font-medium mb-2" style="color: var(--text);">Bank-Grade Security</h3>
+                    <p class="font-mono text-xs leading-relaxed" style="color: var(--text-muted);">AES-256 encryption. Files auto-delete after 1 hour. Zero data retention.</p>
+                </div>
+
+                <div class="c-card p-6 rounded-xl reveal">
+                    <div class="w-12 h-12 rounded-lg flex items-center justify-center mb-4" style="background: var(--bg-secondary);">
+                        <i class="fa-solid fa-bolt" style="color: var(--text);"></i>
+                    </div>
+                    <h3 class="font-mono font-medium mb-2" style="color: var(--text);">Lightning Fast</h3>
+                    <p class="font-mono text-xs leading-relaxed" style="color: var(--text-muted);">GPU-accelerated processing. Average conversion time under 300 milliseconds.</p>
+                </div>
+
+                <div class="c-card p-6 rounded-xl reveal">
+                    <div class="w-12 h-12 rounded-lg flex items-center justify-center mb-4" style="background: var(--bg-secondary);">
+                        <i class="fa-solid fa-brain" style="color: var(--text);"></i>
+                    </div>
+                    <h3 class="font-mono font-medium mb-2" style="color: var(--text);">AI Powered OCR</h3>
+                    <p class="font-mono text-xs leading-relaxed" style="color: var(--text-muted);">Machine learning extraction with 99.2% accuracy on scanned documents.</p>
+                </div>
+
+                <div class="c-card p-6 rounded-xl reveal">
+                    <div class="w-12 h-12 rounded-lg flex items-center justify-center mb-4" style="background: var(--bg-secondary);">
+                        <i class="fa-solid fa-code" style="color: var(--text);"></i>
+                    </div>
+                    <h3 class="font-mono font-medium mb-2" style="color: var(--text);">Developer API</h3>
+                    <p class="font-mono text-xs leading-relaxed" style="color: var(--text-muted);">RESTful API with SDKs for Python, Node.js, Ruby, and Go.</p>
+                </div>
+            </div>
+
+            <!-- Code Preview -->
+            <div class="mt-16 max-w-3xl mx-auto reveal">
+                <div class="rounded-xl border overflow-hidden" style="border-color: var(--border); background: #0a0a0a;">
+                    <div class="flex items-center gap-2 px-4 py-3 border-b" style="border-color: #262626;">
+                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                        <span class="ml-2 font-mono text-xs text-neutral-500">api_example.js</span>
+                    </div>
+                    <div class="p-6 overflow-x-auto">
+                        <pre class="font-mono text-sm leading-relaxed">
+<span class="text-purple-400">const</span> <span class="text-blue-400">ConvertFlow</span> <span class="text-neutral-500">=</span> <span class="text-blue-400">require</span><span class="text-neutral-400">(</span><span class="text-green-400">'convertflow-sdk'</span><span class="text-neutral-400">)</span><span class="text-neutral-500">;</span>
+
+<span class="text-purple-400">const</span> <span class="text-blue-400">client</span> <span class="text-neutral-500">=</span> <span class="text-purple-400">new</span> <span class="text-yellow-400">ConvertFlow</span><span class="text-neutral-400">({</span>
+  <span class="text-blue-400">apiKey</span><span class="text-neutral-500">:</span> <span class="text-green-400">'cf_live_xxxxxxxx'</span><span class="text-neutral-500">,</span>
+  <span class="text-blue-400">region</span><span class="text-neutral-500">:</span> <span class="text-green-400">'us-east-1'</span>
+<span class="text-neutral-400">})</span><span class="text-neutral-500">;</span>
+
+<span class="text-gray-500">// Convert Word to PDF in one line</span>
+<span class="text-purple-400">await</span> <span class="text-blue-400">client</span><span class="text-neutral-500">.</span><span class="text-yellow-400">convert</span><span class="text-neutral-400">({</span>
+  <span class="text-blue-400">file</span><span class="text-neutral-500">:</span> <span class="text-green-400">'document.docx'</span><span class="text-neutral-500">,</span>
+  <span class="text-blue-400">to</span><span class="text-neutral-500">:</span> <span class="text-green-400">'pdf'</span><span class="text-neutral-500">,</span>
+  <span class="text-blue-400">quality</span><span class="text-neutral-500">:</span> <span class="text-green-400">'high'</span>
+<span class="text-neutral-400">})</span><span class="text-neutral-500">;</span></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing -->
+    <section id="pricing" class="py-24">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-16 reveal">
+                <div class="font-mono text-xs mb-2" style="color: var(--text-muted);">// 03</div>
+                <h2 class="font-mono font-bold text-3xl md:text-4xl" style="color: var(--text);">Simple Pricing</h2>
+                <p class="font-mono text-sm mt-2" style="color: var(--text-muted);">No hidden fees. Cancel anytime.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+                <!-- Hobby -->
+                <div class="c-card p-8 rounded-xl reveal">
+                    <div class="mb-6">
+                        <h3 class="font-mono font-medium text-lg mb-2" style="color: var(--text);">Hobby</h3>
+                        <div class="font-mono text-3xl font-bold" style="color: var(--text);">$0<span class="text-sm font-normal" style="color: var(--text-muted);">/mo</span></div>
+                    </div>
+                    <ul class="space-y-3 mb-8">
+                        <li class="flex items-center gap-3 font-mono text-sm" style="color: var(--text-muted);">
+                            <i class="fa-solid fa-check text-green-500 text-xs"></i> 10 conversions/day
+                        </li>
+                        <li class="flex items-center gap-3 font-mono text-sm" style="color: var(--text-muted);">
+                            <i class="fa-solid fa-check text-green-500 text-xs"></i> Max 5MB file size
+                        </li>
+                        <li class="flex items-center gap-3 font-mono text-sm" style="color: var(--text-muted);">
+                            <i class="fa-solid fa-check text-green-500 text-xs"></i> 5 formats supported
+                        </li>
+                        <li class="flex items-center gap-3 font-mono text-sm" style="color: var(--text-muted); opacity: 0.5;">
+                            <i class="fa-solid fa-xmark text-xs"></i> No API access
+                        </li>
+                    </ul>
+                    <button class="w-full py-3 rounded font-mono text-sm border transition-colors"
+                        style="border-color: var(--border); color: var(--text);">Start Free</button>
+                </div>
+
+                <!-- Pro -->
+                <div class="c-card p-8 rounded-xl relative transform md:-translate-y-4 shadow-2xl reveal" style="border-color: var(--accent);">
+                    <div class="absolute -top-3 left-1/2 -translate-x-1/2">
+                        <span class="px-3 py-1 font-mono text-xs rounded-full" 
+                              style="background: var(--accent); color: var(--bg);">Most Popular</span>
+                    </div>
+                    <div class="mb-6">
+                        <h3 class="font-mono font-medium text-lg mb-2" style="color: var(--text);">Pro</h3>
+                        <div class="font-mono text-3xl font-bold" style="color: var(--text);">$4.99<span class="text-sm font-normal" style="color: var(--text-muted);">/mo</span></div>
+                    </div>
+                    <ul class="space-y-3 mb-8">
+                        <li class="flex items-center gap-3 font-mono text-sm" style="color: var(--text-muted);">
+                            <i class="fa-solid fa-check text-green-500 text-xs"></i> Unlimited conversions
+                        </li>
+                        <li class="flex items-center gap-3 font-mono text-sm" style="color: var(--text-muted);">
+                            <i class="fa-solid fa-check text-green-500 text-xs"></i> Max 100MB file size
+                        </li>
+                        <li class="flex items-center gap-3 font-mono text-sm" style="color: var(--text-muted);">
+                            <i class="fa-solid fa-check text-green-500 text-xs"></i> All 50+ formats
+                        </li>
+                        <li class="flex items-center gap-3 font-mono text-sm" style="color: var(--text-muted);">
+                            <i class="fa-solid fa-check text-green-500 text-xs"></i> API: 1,000 calls/mo
+                        </li>
+                        <li class="flex items-center gap-3 font-mono text-sm" style="color: var(--text-muted);">
+                            <i class="fa-solid fa-check text-green-500 text-xs"></i> Priority processing
+                        </li>
+                        <li class="flex items-center gap-3 font-mono text-sm" style="color: var(--text-muted);">
+                            <i class="fa-solid fa-check text-green-500 text-xs"></i> OCR included
+                        </li>
+                    </ul>
+                    <a href="https://vencodeofficial.lemonsqueezy.com/checkout/buy/fd711d9c-48fb-4523-a301-d9bf38a5b290?desc=0&discount=0" 
+                       target="_blank"
+                       class="w-full py-3 rounded font-mono text-sm font-medium block text-center transition-opacity hover:opacity-90"
+                       style="background: var(--accent); color: var(--bg);">Subscribe to Pro</a>
+                </div>
+
+                <!-- Enterprise -->
+                <div class="c-card p-8 rounded-xl reveal">
+                    <div class="mb-6">
+                        <h3 class="font-mono font-medium text-lg mb-2" style="color: var(--text);">Enterprise</h3>
+                        <div class="font-mono text-3xl font-bold" style="color: var(--text);">$19.99<span class="text-sm font-normal" style="color: var(--text-muted);">/mo</span></div>
+                    </div>
+                    <ul class="space-y-3 mb-8">
+                        <li class="flex items-center gap-3 font-mono text-sm" style="color: var(--text-muted);">
+                            <i class="fa-solid fa-check text-green-500 text-xs"></i> Everything in Pro
+                        </li>
+                        <li class="flex items-center gap-3 font-mono text-sm" style="color: var(--text-muted);">
+                            <i class="fa-solid fa-check text-green-500 text-xs"></i> Max 500MB file size
+                        </li>
+                        <li class="flex items-center gap-3 font-mono text-sm" style="color: var(--text-muted);">
+                            <i class="fa-solid fa-check text-green-500 text-xs"></i> API: 50,000 calls/mo
+                        </li>
+                        <li class="flex items-center gap-3 font-mono text-sm" style="color: var(--text-muted);">
+                            <i class="fa-solid fa-check text-green-500 text-xs"></i> Custom integrations
+                        </li>
+                        <li class="flex items-center gap-3 font-mono text-sm" style="color: var(--text-muted);">
+                            <i class="fa-solid fa-check text-green-500 text-xs"></i> Dedicated support
+                        </li>
+                        <li class="flex items-center gap-3 font-mono text-sm" style="color: var(--text-muted);">
+                            <i class="fa-solid fa-check text-green-500 text-xs"></i> SLA guarantee
+                        </li>
+                    </ul>
+                    <button class="w-full py-3 rounded font-mono text-sm border transition-colors"
+                        style="border-color: var(--border); color: var(--text);">Contact Sales</button>
+                </div>
+            </div>
+
+            <div class="mt-16 flex flex-wrap justify-center items-center gap-8 opacity-40">
+                <div class="font-mono text-xs" style="color: var(--text-muted);">SOC 2 Type II</div>
+                <div class="w-1 h-1 rounded-full" style="background: var(--text-muted);"></div>
+                <div class="font-mono text-xs" style="color: var(--text-muted);">GDPR Compliant</div>
+                <div class="w-1 h-1 rounded-full" style="background: var(--text-muted);"></div>
+                <div class="font-mono text-xs" style="color: var(--text-muted);">ISO 27001</div>
+                <div class="w-1 h-1 rounded-full" style="background: var(--text-muted);"></div>
+                <div class="font-mono text-xs" style="color: var(--text-muted);">HIPAA Ready</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- API -->
+    <section id="api" class="py-24 border-y" style="border-color: var(--border);">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div class="reveal">
+                    <div class="font-mono text-xs mb-2" style="color: var(--text-muted);">// 04</div>
+                    <h2 class="font-mono font-bold text-3xl md:text-4xl mb-6" style="color: var(--text);">Built for Developers</h2>
+                    <p class="font-mono text-sm leading-relaxed mb-8" style="color: var(--text-muted);">
+                        Integrate document conversion into your application with our RESTful API. 
+                        Webhooks, batch processing, and custom workflows supported out of the box.
+                    </p>
+                    
+                    <div class="space-y-4">
+                        <div class="flex items-start gap-4">
+                            <div class="w-8 h-8 rounded flex items-center justify-center flex-shrink-0 mt-1" style="background: var(--bg-secondary);">
+                                <span class="font-mono text-xs" style="color: var(--text-muted);">01</span>
+                            </div>
+                            <div>
+                                <h4 class="font-mono font-medium mb-1" style="color: var(--text);">REST API</h4>
+                                <p class="font-mono text-xs" style="color: var(--text-muted);">Simple HTTP endpoints with JSON responses</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-4">
+                            <div class="w-8 h-8 rounded flex items-center justify-center flex-shrink-0 mt-1" style="background: var(--bg-secondary);">
+                                <span class="font-mono text-xs" style="color: var(--text-muted);">02</span>
+                            </div>
+                            <div>
+                                <h4 class="font-mono font-medium mb-1" style="color: var(--text);">Webhooks</h4>
+                                <p class="font-mono text-xs" style="color: var(--text-muted);">Real-time notifications on conversion completion</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-4">
+                            <div class="w-8 h-8 rounded flex items-center justify-center flex-shrink-0 mt-1" style="background: var(--bg-secondary);">
+                                <span class="font-mono text-xs" style="color: var(--text-muted);">03</span>
+                            </div>
+                            <div>
+                                <h4 class="font-mono font-medium mb-1" style="color: var(--text);">SDKs</h4>
+                                <p class="font-mono text-xs" style="color: var(--text-muted);">Native packages for Python, Node, Ruby, Go, PHP</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-8 flex gap-4">
+                        <button class="px-6 py-3 rounded font-mono text-sm transition-opacity hover:opacity-90"
+                            style="background: var(--accent); color: var(--bg);">Read Docs</button>
+                        <button class="px-6 py-3 rounded font-mono text-sm border transition-colors"
+                            style="border-color: var(--border); color: var(--text);">Get API Key</button>
+                    </div>
+                </div>
+
+                <div class="relative reveal">
+                    <div class="absolute inset-0 rounded-xl blur-2xl opacity-30" style="background: var(--accent);"></div>
+                    <div class="relative rounded-xl border p-6 shadow-2xl" style="border-color: var(--border); background: var(--bg-card);">
+                        <div class="flex items-center gap-2 mb-4 pb-4 border-b" style="border-color: var(--border);">
+                            <div class="w-3 h-3 rounded-full bg-red-400"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-400"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-400"></div>
+                            <span class="ml-2 font-mono text-xs" style="color: var(--text-muted);">terminal</span>
+                        </div>
+                        <div class="font-mono text-sm space-y-2" style="color: var(--text-muted);">
+                            <div>$ npm install convertflow-sdk</div>
+                            <div>$</div>
+                            <div class="text-green-500">✓</div> package installed successfully
+                            <div>$ node convert.js</div>
+                            <div style="color: var(--accent);">→</div> uploading document.docx...
+                            <div style="color: var(--accent);">→</div> converting to PDF...
+                            <div class="text-green-500">✓</div> conversion complete: 0.24s
+                            <div style="color: var(--accent);">→</div> downloading output.pdf...
+                            <div class="text-green-500">✓</div> saved to ./downloads/output.pdf
+                            <div>$ <span class="cursor-blink"></span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t py-12" style="border-color: var(--border);">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-6">
+                <div class="flex items-center gap-3">
+                    <div class="w-6 h-6 rounded flex items-center justify-center" style="background: var(--accent);">
+                        <i class="fa-solid fa-code text-xs" style="color: var(--bg);"></i>
+                    </div>
+                    <span class="font-mono font-bold" style="color: var(--text);">ConvertFlow</span>
+                </div>
+                
+                <div class="flex items-center gap-6 font-mono text-xs" style="color: var(--text-muted);">
+                    <a href="#" class="hover:text-[var(--accent)] transition-colors">Privacy</a>
+                    <a href="#" class="hover:text-[var(--accent)] transition-colors">Terms</a>
+                    <a href="#" class="hover:text-[var(--accent)] transition-colors">Security</a>
+                    <a href="#" class="hover:text-[var(--accent)] transition-colors">Status</a>
+                    <a href="#" class="hover:text-[var(--accent)] transition-colors">GitHub</a>
+                </div>
+
+                <div class="font-mono text-xs" style="color: var(--text-muted);">© 2026 ConvertFlow Inc.</div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Conversion Modal -->
+    <div id="conversionModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeModal()"></div>
+        <div class="relative rounded-xl border p-8 max-w-md w-full shadow-2xl animate-fade-in" 
+             style="background: var(--bg-card); border-color: var(--border);">
+            <button onclick="closeModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                style="background: var(--bg-secondary); color: var(--text-muted);">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            
+            <div class="text-center mb-6">
+                <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style="background: var(--bg-secondary);">
+                    <i class="fa-solid fa-gear fa-spin" style="color: var(--text-muted);"></i>
+                </div>
+                <h3 class="font-mono font-medium text-lg mb-2" id="modalTitle" style="color: var(--text);">Converting...</h3>
+                <p class="font-mono text-xs" id="modalSubtitle" style="color: var(--text-muted);">Processing your file</p>
+            </div>
+
+            <div class="space-y-4">
+                <div class="h-2 rounded-full overflow-hidden" style="background: var(--bg-secondary);">
+                    <div id="progressBar" class="h-full progress-stripe rounded-full transition-all duration-300" style="width: 0%; background: var(--accent);"></div>
+                </div>
+                <div class="flex justify-between font-mono text-xs" style="color: var(--text-muted);">
+                    <span id="progressText">0%</span>
+                    <span id="progressSize">0MB / 0MB</span>
+                </div>
+            </div>
+
+            <div id="modalSuccess" class="hidden mt-6 text-center">
+                <a id="downloadBtn" href="#" class="w-full py-3 rounded font-mono text-sm font-medium block text-center transition-opacity hover:opacity-90"
+                   style="background: var(--accent); color: var(--bg);">
+                    <i class="fa-solid fa-download mr-2"></i>Download File
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== CONFIG =====
+        const API_URL = 'https://convertflow-api.onrender.com';
+        const themes = ['light', 'dark', 'midnight', 'zen'];
+        let currentThemeIndex = 0;
+
+        // ===== THEME ENGINE =====
+        function applyTheme(name) {
+            const html = document.documentElement;
+            html.setAttribute('data-theme', name);
+            localStorage.setItem('cf-theme', name);
+            
+            if (name === 'dark') html.classList.add('dark');
+            else html.classList.remove('dark');
+
+            // Update icon
+            const icon = document.getElementById('themeIcon');
+            if (name === 'light') icon.className = 'fa-solid fa-sun';
+            else if (name === 'dark') icon.className = 'fa-solid fa-moon';
+            else if (name === 'midnight') icon.className = 'fa-solid fa-star';
+            else if (name === 'zen') icon.className = 'fa-solid fa-leaf';
+        }
+
+        function cycleTheme() {
+            currentThemeIndex = (currentThemeIndex + 1) % themes.length;
+            applyTheme(themes[currentThemeIndex]);
+        }
+
+        // Init theme
+        const saved = localStorage.getItem('cf-theme') || 'light';
+        currentThemeIndex = themes.indexOf(saved);
+        if (currentThemeIndex === -1) currentThemeIndex = 0;
+        applyTheme(themes[currentThemeIndex]);
+
+        document.getElementById('themeToggle').addEventListener('click', cycleTheme);
+
+        // ===== NAVBAR =====
+        const navbar = document.getElementById('navbar');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50) {
+                navbar.style.background = 'rgba(var(--bg), 0.8)';
+                navbar.style.backdropFilter = 'blur(12px)';
+                navbar.style.borderBottom = '1px solid var(--border)';
+            } else {
+                navbar.style.background = 'transparent';
+                navbar.style.backdropFilter = 'none';
+                navbar.style.borderBottom = 'none';
+            }
+        });
+
+        // ===== COMMAND PALETTE =====
+        const palette = document.getElementById('commandPalette');
+        const cmdInput = document.getElementById('commandInput');
+        const cmdResults = document.getElementById('commandResults');
+
+        const converterList = [
+            { name: 'Text to PDF', desc: 'TXT → PDF', action: () => selectConverter('text-to-pdf') },
+            { name: 'Word to PDF', desc: 'DOCX → PDF', action: () => selectConverter('word-to-pdf') },
+            { name: 'PDF to Word', desc: 'PDF → DOCX', action: () => selectConverter('pdf-to-word') },
+            { name: 'Image to PDF', desc: 'IMG → PDF', action: () => selectConverter('image-to-pdf') },
+            { name: 'PDF to Image', desc: 'PDF → IMG', action: () => selectConverter('pdf-to-image') },
+            { name: 'Merge PDF', desc: 'PDF + PDF', action: () => selectConverter('merge-pdf') },
+            { name: 'Split PDF', desc: 'PDF → PDFs', action: () => selectConverter('split-pdf') },
+            { name: 'Compress PDF', desc: 'PDF → PDF', action: () => selectConverter('compress-pdf') },
+            { name: 'Excel to PDF', desc: 'XLSX → PDF', action: () => selectConverter('excel-to-pdf') },
+            { name: 'PPT to PDF', desc: 'PPT → PDF', action: () => selectConverter('ppt-to-pdf') },
+            { name: 'HTML to PDF', desc: 'HTML → PDF', action: () => selectConverter('html-to-pdf') },
+            { name: 'OCR Extraction', desc: 'IMG → TXT', action: () => selectConverter('ocr-pdf') },
+        ];
+
+        function openCommandPalette() {
+            palette.classList.remove('hidden');
+            palette.classList.add('flex');
+            cmdInput.value = '';
+            cmdInput.focus();
+            renderCmdResults(converterList);
+        }
+
+        function closeCommandPalette() {
+            palette.classList.add('hidden');
+            palette.classList.remove('flex');
+        }
+
+        function renderCmdResults(items) {
+            cmdResults.innerHTML = items.map(item => `
+                <div onclick="(${item.action})(); closeCommandPalette();" 
+                     class="flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors"
+                     style="hover: background: var(--bg-secondary);">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-terminal text-xs" style="color: var(--text-muted);"></i>
+                        <span class="font-mono text-sm" style="color: var(--text);">${item.name}</span>
+                    </div>
+                    <span class="font-mono text-xs" style="color: var(--text-muted);">${item.desc}</span>
+                </div>
+            `).join('');
+        }
+
+        cmdInput.addEventListener('input', (e) => {
+            const q = e.target.value.toLowerCase();
+            const filtered = converterList.filter(c => c.name.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q));
+            renderCmdResults(filtered);
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                openCommandPalette();
+            }
+            if (e.key === 'Escape') {
+                closeCommandPalette();
+                closeModal();
+            }
+        });
+
+        // ===== FILE UPLOAD =====
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const conversionArea = document.getElementById('conversionArea');
+        window.uploadedFiles = [];
+
+        uploadZone.addEventListener('click', () => fileInput.click());
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+        uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        function handleFiles(files) {
+            if (!files.length) return;
+            window.uploadedFiles = Array.from(files);
+            conversionArea.classList.remove('hidden');
+            conversionArea.innerHTML = '';
+
+            window.uploadedFiles.forEach((file, index) => {
+                const card = document.createElement('div');
+                card.className = 'flex items-center gap-4 p-4 rounded-xl border reveal visible';
+                card.style.cssText = 'background: var(--bg-card); border-color: var(--border);';
+                
+                const icon = getFileIcon(file.name);
+                const size = formatBytes(file.size);
+
+                card.innerHTML = `
+                    <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background: var(--bg-secondary);">
+                        <i class="fa-solid ${icon}" style="color: var(--text-muted);"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-mono text-sm truncate" style="color: var(--text);">${file.name}</div>
+                        <div class="font-mono text-xs" style="color: var(--text-muted);">${size}</div>
+                    </div>
+                    <select id="format-${index}" class="px-3 py-2 rounded border font-mono text-xs outline-none" 
+                        style="border-color: var(--border); background: var(--bg); color: var(--text);">
+                        <option value="pdf">PDF</option>
+                        <option value="docx">DOCX</option>
+                        <option value="txt">TXT</option>
+                        <option value="png">PNG</option>
+                        <option value="jpg">JPG</option>
+                    </select>
+                    <button onclick="startConversion(${index})" class="px-4 py-2 rounded font-mono text-xs transition-opacity hover:opacity-90"
+                        style="background: var(--accent); color: var(--bg);">Convert</button>
+                `;
+                conversionArea.appendChild(card);
+            });
+        }
+
+        function getFileIcon(name) {
+            const ext = name.split('.').pop().toLowerCase();
+            const map = { pdf:'fa-file-pdf', doc:'fa-file-word', docx:'fa-file-word', txt:'fa-file-lines', jpg:'fa-file-image', jpeg:'fa-file-image', png:'fa-file-image', webp:'fa-file-image', xls:'fa-file-excel', xlsx:'fa-file-excel', ppt:'fa-file-powerpoint', pptx:'fa-file-powerpoint', html:'fa-file-code', md:'fa-file-code' };
+            return map[ext] || 'fa-file';
+        }
+
+        function formatBytes(b) {
+            if (!b) return '0 Bytes';
+            const k = 1024, sizes = ['Bytes','KB','MB','GB'];
+            const i = Math.floor(Math.log(b)/Math.log(k));
+            return parseFloat((b/Math.pow(k,i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function selectConverter(type) {
+            document.getElementById('converters').scrollIntoView({ behavior: 'smooth' });
+            uploadZone.style.borderColor = 'var(--accent)';
+            setTimeout(() => uploadZone.style.borderColor = 'var(--border)', 400);
+        }
+
+        // ===== REAL CONVERSION + DOWNLOAD =====
+        async function startConversion(index) {
+            const file = window.uploadedFiles[index];
+            if (!file) return;
+
+            const modal = document.getElementById('conversionModal');
+            const bar = document.getElementById('progressBar');
+            const pct = document.getElementById('progressText');
+            const sizeLabel = document.getElementById('progressSize');
+            const success = document.getElementById('modalSuccess');
+            const title = document.getElementById('modalTitle');
+            const sub = document.getElementById('modalSubtitle');
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            success.classList.add('hidden');
+            title.textContent = 'Uploading...';
+            sub.textContent = file.name;
+            bar.style.width = '10%';
+            pct.textContent = '10%';
+            sizeLabel.textContent = `0MB / ${formatBytes(file.size)}`;
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('format', document.getElementById(`format-${index}`).value);
+
+                const res = await fetch(`${API_URL}/convert`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                bar.style.width = '70%';
+                pct.textContent = '70%';
+
+                const data = await res.json();
+
+                if (data.success) {
+                    bar.style.width = '100%';
+                    pct.textContent = '100%';
+                    sizeLabel.textContent = `${formatBytes(file.size)} / ${formatBytes(file.size)}`;
+                    title.textContent = 'Complete!';
+                    sub.textContent = 'Your file is ready';
+
+                    const btn = document.getElementById('downloadBtn');
+                    const url = `${API_URL}/download/${data.fileId}?name=${encodeURIComponent(data.fileName)}`;
+                    btn.href = url;
+                    btn.download = data.fileName;
+                    // Also handle click for cross-origin downloads
+                    btn.onclick = (e) => {
+                        e.preventDefault();
+                        window.open(url, '_blank');
+                    };
+
+                    success.classList.remove('hidden');
+                } else {
+                    throw new Error(data.message || 'Conversion failed');
+                }
+            } catch (err) {
+                console.error(err);
+                title.textContent = 'Error';
+                sub.textContent = err.message || 'Failed to connect to server';
+                bar.style.width = '100%';
+                bar.style.background = '#ef4444';
+            }
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('conversionModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            // Reset bar color
+            document.getElementById('progressBar').style.background = 'var(--accent)';
+        }
+
+        // ===== SCROLL REVEAL =====
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) entry.target.classList.add('visible');
+            });
+        }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+    </script>
+</body>
+</html>
